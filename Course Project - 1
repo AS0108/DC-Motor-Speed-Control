@@ -1,0 +1,89 @@
+#include <reg51.h>
+#include <lcd.h>  // Include LCD library if using an LCD
+
+// Define pins and constants
+#define POTENTIOMETER_PIN P1
+#define SPEED_SENSOR_PIN P2
+#define PWM_PIN P3_0
+#define DESIRED_SPEED 100  // Desired speed value (to be adjusted)
+
+volatile unsigned int currentSpeed = 0;
+volatile unsigned int pwmDutyCycle = 0;
+
+// Function prototypes
+void Timer0_ISR(void) __interrupt(1);
+void Init_Timer0(void);
+void Init_PWM(void);
+void Read_Speed_Sensor(void);
+void Update_Display(void);
+void Control_Motor_Speed(void);
+
+void main() {
+    // Initialize peripherals
+    Init_Timer0();
+    Init_PWM();
+    LCD_Init();  // Initialize LCD if used
+
+    while (1) {
+        Read_Speed_Sensor();
+        Control_Motor_Speed();
+        Update_Display();
+    }
+}
+
+// Timer0 Interrupt Service Routine for PWM generation
+void Timer0_ISR(void) __interrupt(1) {
+    static bit toggle = 0;
+    if (toggle) {
+        PWM_PIN = 1;  // Set PWM high
+    } else {
+        PWM_PIN = 0;  // Set PWM low
+    }
+    toggle = !toggle;
+}
+
+// Initialize Timer0 for PWM
+void Init_Timer0(void) {
+    TMOD = 0x02;  // Timer0 in Mode 2 (8-bit auto-reload)
+    TH0 = 0xFF;   // Set the timer reload value
+    TL0 = 0xFF;   // Set the timer reload value
+    ET0 = 1;      // Enable Timer0 interrupt
+    EA = 1;       // Enable global interrupt
+    TR0 = 1;      // Start Timer0
+}
+
+// Initialize PWM
+void Init_PWM(void) {
+    // Set PWM period and duty cycle
+    // PWM configuration should be adjusted as per motor driver requirements
+    pwmDutyCycle = 128;  // Initial duty cycle (50%)
+}
+
+// Read speed sensor value (mock implementation)
+void Read_Speed_Sensor(void) {
+    currentSpeed = SPEED_SENSOR_PIN;  // Read from speed sensor
+}
+
+// Control motor speed based on feedback
+void Control_Motor_Speed(void) {
+    unsigned int error, control;
+    unsigned int desiredSpeed = POTENTIOMETER_PIN;  // Read desired speed from potentiometer
+
+    error = desiredSpeed - currentSpeed;
+    control = (error > 0) ? pwmDutyCycle + (error / 10) : pwmDutyCycle - (error / 10); // Simple P controller
+    
+    // Ensure PWM duty cycle is within bounds
+    if (control > 255) control = 255;
+    if (control < 0) control = 0;
+
+    pwmDutyCycle = control;
+}
+
+// Update display with current and desired speed (mock implementation)
+void Update_Display(void) {
+    LCD_Clear();
+    LCD_Print("Current Speed: ");
+    LCD_PrintNum(currentSpeed);
+    LCD_Print("Desired Speed: ");
+    LCD_PrintNum(POTENTIOMETER_PIN);
+}
